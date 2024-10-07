@@ -1,5 +1,3 @@
-// AudioClient.js
-
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { start_asr, stop_asr, process_audio_chunk } from '@/app/actions/ASRactions';
@@ -11,20 +9,12 @@ export default function AudioClient() {
   const [loading, setLoading] = useState(false);
   const audioCtxRef = useRef(null);
   const audioChunkBuffer = useRef([]); // Buffer for storing audio chunks
-  const processingIntervalRef = useRef(null); // Ref to store the processing interval
 
   const startOrStop = async (start, stop) => {
     if (start) {
       await start_asr();
     } else if (stop) {
       await stop_asr();
-    }
-  };
-
-  const processAudioChunk = async (inputAudioChunk) => {
-    const response = await process_audio_chunk(inputAudioChunk);
-    if (response.transcription) {
-      setTranscription(response.transcription);
     }
   };
 
@@ -50,14 +40,6 @@ export default function AudioClient() {
       audioInput.connect(recorder);
       recorder.connect(audioContext.destination);
 
-      // Start processing audio chunks every 100ms
-      processingIntervalRef.current = setInterval(() => {
-        if (audioChunkBuffer.current.length > 0) {
-          const chunkToProcess = audioChunkBuffer.current.shift(); // Get the oldest chunk
-          processAudioChunk(chunkToProcess); // Process the chunk
-        }
-      }, 100); // Process every 100ms
-
       setLoading(false);
       setIsAudioStarted(true);
     }
@@ -71,22 +53,32 @@ export default function AudioClient() {
     }
 
     startOrStop(false, true);
-
-    // Clear the interval when audio stops
-    if (processingIntervalRef.current) {
-      clearInterval(processingIntervalRef.current);
-      processingIntervalRef.current = null;
-    }
   };
+
+  // Effect for processing audio chunks
+  useEffect(() => {
+    const processingInterval = setInterval(async () => {
+      // Only process audio chunks if audio is still running
+      if (isAudioStarted && audioChunkBuffer.current.length > 0) {
+        const chunkToProcess = audioChunkBuffer.current.shift(); // Get the oldest chunk
+
+        // Process the audio chunk
+        const response = await process_audio_chunk(chunkToProcess);
+        if (response?.transcription) {
+          setTranscription(response.transcription);
+        }
+      }
+    }, 100); // Process every 100ms
+
+    return () => {
+      clearInterval(processingInterval); // Clean up the interval on unmount or stop
+    };
+  }, [isAudioStarted]); // Run this effect when audio starts or stops
 
   useEffect(() => {
     return () => {
       if (audioCtxRef.current) {
         audioCtxRef.current.close();
-      }
-      // Clear the interval if component unmounts
-      if (processingIntervalRef.current) {
-        clearInterval(processingIntervalRef.current);
       }
     };
   }, []);

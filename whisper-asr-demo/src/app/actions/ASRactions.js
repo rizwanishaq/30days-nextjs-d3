@@ -2,20 +2,26 @@
 import StreamingASR from "@/lib/StreamASR";
 import { generateUniqueSequenceId } from "@/lib/utils";
 
-// Generate a unique sequence ID for the ASR session
-const sequenceId = generateUniqueSequenceId();
-const streamingASR = new StreamingASR("integrator", sequenceId);
+/**
+ * The current StreamingASR instance.
+ * 
+ * This variable holds the active StreamingASR instance.
+ */
+let streamingASR = null;
 
 /**
  * Starts the ASR session.
  * 
- * This function initiates the automatic speech recognition (ASR) process by 
- * calling the start method of the StreamingASR instance.
+ * This function creates a new instance of StreamingASR and initiates the 
+ * automatic speech recognition (ASR) process by calling the start method.
  *
  * @returns {Promise<any>} - The response from the ASR service after starting the session.
  */
 export async function start_asr() {
-    const response = await streamingASR.start();
+    const sequenceId = generateUniqueSequenceId(); // Generate a unique sequence ID
+    streamingASR = new StreamingASR("integrator", sequenceId); // Create a new instance
+
+    const response = await streamingASR.start(); // Start the ASR session
     console.log(response);
     return response;
 }
@@ -24,14 +30,20 @@ export async function start_asr() {
  * Stops the ASR session.
  * 
  * This function terminates the automatic speech recognition (ASR) process by 
- * calling the stop method of the StreamingASR instance.
+ * calling the stop method of the StreamingASR instance and sets it to null.
  *
  * @returns {Promise<any>} - The response from the ASR service after stopping the session.
  */
 export async function stop_asr() {
-    const response = await streamingASR.stop();
-    console.log(response);
-    return response;
+    if (streamingASR) {
+        const response = await streamingASR.stop(); // Stop the ASR session
+        console.log(response);
+        streamingASR = null; // Reset the StreamingASR instance
+        return response;
+    } else {
+        console.log("No active ASR session to stop.");
+        return null;
+    }
 }
 
 /**
@@ -45,6 +57,11 @@ export async function stop_asr() {
  * @returns {Promise<any>} - The response from the ASR service after processing the audio chunk.
  */
 export async function process_audio_chunk(data) {
+    if (!streamingASR) {
+        console.log("StreamingASR instance is not active. Cannot process audio chunk.");
+        return null; // Early exit if no active instance
+    }
+
     data = new Int16Array(data); // Ensure data is in Int16 format
     data = Buffer.from(data.buffer); // Convert the data to a Buffer
     const response = await streamingASR.processAudioChunk(data);
