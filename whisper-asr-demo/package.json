@@ -11,7 +11,9 @@
   "dependencies": {
     "@grpc/grpc-js": "^1.11.3",
     "@grpc/proto-loader": "^0.7.13",
+    "@heroicons/react": "^2.1.5",
     "crypto": "^1.0.1",
+    "heroicons": "^2.1.5",
     "next": "14.2.13",
     "path": "^0.12.7",
     "react": "^18",
