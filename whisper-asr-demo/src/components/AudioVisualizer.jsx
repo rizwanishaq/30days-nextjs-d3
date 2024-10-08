@@ -1,5 +1,3 @@
-// components/AudioVisualizer.js
-
 import { useRef, useEffect } from 'react';
 
 export default function AudioVisualizer({ audioInput, audioContext, isAudioStarted }) {
@@ -24,19 +22,25 @@ export default function AudioVisualizer({ audioInput, audioContext, isAudioStart
       requestAnimationFrame(draw);
 
       analyser.getByteTimeDomainData(dataArray);
-
       canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
 
-      canvasCtx.lineWidth = 2;
-      canvasCtx.strokeStyle = 'rgb(0, 123, 255)';
-      canvasCtx.beginPath();
+      // Create a gradient for the waveform
+      const gradient = canvasCtx.createLinearGradient(0, 0, 0, canvas.height);
+      gradient.addColorStop(0, '#ff0080');
+      gradient.addColorStop(0.5, '#ff8c00');
+      gradient.addColorStop(1, '#00bfff');
 
+      // Set styles for the waveform
+      canvasCtx.lineWidth = 3;
+      canvasCtx.strokeStyle = gradient;
+
+      canvasCtx.beginPath();
       const sliceWidth = canvas.width / bufferLength;
       let x = 0;
 
       for (let i = 0; i < bufferLength; i++) {
-        const v = dataArray[i] / 128.0;
-        const y = (v * canvas.height) / 2;
+        const v = dataArray[i] / 128.0; // Normalize the value
+        const y = (v * canvas.height) / 2; // Scale to canvas height
 
         if (i === 0) {
           canvasCtx.moveTo(x, y);
@@ -49,6 +53,36 @@ export default function AudioVisualizer({ audioInput, audioContext, isAudioStart
 
       canvasCtx.lineTo(canvas.width, canvas.height / 2);
       canvasCtx.stroke();
+
+      // Draw a glowing effect around the waveform
+      canvasCtx.shadowColor = 'rgba(255, 255, 255, 0.5)';
+      canvasCtx.shadowBlur = 10;
+      canvasCtx.stroke();
+
+      // Draw a grid for better visibility
+      drawGrid(canvasCtx, canvas.width, canvas.height);
+    };
+
+    const drawGrid = (ctx, width, height) => {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+      ctx.lineWidth = 0.5;
+
+      for (let i = 0; i < width; i += 20) {
+        ctx.beginPath();
+        ctx.moveTo(i, 0);
+        ctx.lineTo(i, height);
+        ctx.stroke();
+      }
+
+      for (let i = 0; i < height; i += 20) {
+        ctx.beginPath();
+        ctx.moveTo(0, i);
+        ctx.lineTo(width, i);
+        ctx.stroke();
+      }
+
+      ctx.restore();
     };
 
     draw();
@@ -58,5 +92,10 @@ export default function AudioVisualizer({ audioInput, audioContext, isAudioStart
     };
   }, [audioInput, audioContext, isAudioStarted]);
 
-  return <canvas ref={canvasRef} className="w-full h-32 mb-4 bg-gray-200 rounded-md"></canvas>;
+  return (
+    <div className="relative w-full h-40 my-4"> {/* Updated margins */}
+      <canvas ref={canvasRef} className="w-full h-full bg-gray-900 rounded-lg shadow-lg" />
+      <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-blue-500 opacity-30 rounded-lg blur-lg"></div>
+    </div>
+  );
 }

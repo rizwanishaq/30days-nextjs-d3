@@ -2,15 +2,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { start_asr, stop_asr, process_audio_chunk } from '@/app/actions/ASRactions';
 import { downsampleBuffer } from '@/lib/utils';
-import AudioVisualizer from '@/components/AudioVisualizer'; // Import the new component
+import AudioVisualizer from '@/components/AudioVisualizer';
+import TranscriptionList from '@/components/TranscriptionList'; // Import the new component
 
 export default function AudioClient() {
-  const [transcriptionList, setTranscriptionList] = useState([]); // Store transcription as a list
+  const [transcriptionList, setTranscriptionList] = useState([]);
   const [isAudioStarted, setIsAudioStarted] = useState(false);
   const [loading, setLoading] = useState(false);
   const audioCtxRef = useRef(null);
-  const audioChunkBuffer = useRef([]); // Buffer for storing audio chunks
-  const [audioInput, setAudioInput] = useState(null); // Track the audioInput node
+  const audioChunkBuffer = useRef([]);
+  const [audioInput, setAudioInput] = useState(null);
 
   const startOrStop = async (start, stop) => {
     if (start) {
@@ -30,15 +31,15 @@ export default function AudioClient() {
       audioCtxRef.current = audioContext;
 
       const audioInputNode = audioContext.createMediaStreamSource(stream);
-      setAudioInput(audioInputNode); // Store audio input for visualizer
+      setAudioInput(audioInputNode);
 
       await audioContext.audioWorklet.addModule("/worklet/script-processor.js");
 
       const recorder = new AudioWorkletNode(audioContext, "script-processor");
       recorder.port.onmessage = (e) => {
-        const inputAudioChunk = e.data; // Get the audio data from the worklet
-        const downsampledData = downsampleBuffer(inputAudioChunk, audioContext.sampleRate, 16000); // Downsample to 16kHz
-        audioChunkBuffer.current.push(Array.from(downsampledData)); // Store the audio chunk in the buffer
+        const inputAudioChunk = e.data;
+        const downsampledData = downsampleBuffer(inputAudioChunk, audioContext.sampleRate, 16000);
+        audioChunkBuffer.current.push(Array.from(downsampledData));
       };
 
       audioInputNode.connect(recorder);
@@ -59,75 +60,86 @@ export default function AudioClient() {
     startOrStop(false, true);
   };
 
-  // Effect for processing audio chunks
   useEffect(() => {
     const processingInterval = setInterval(async () => {
-      // Only process audio chunks if audio is still running
       if (isAudioStarted && audioChunkBuffer.current.length > 0) {
-        const chunkToProcess = audioChunkBuffer.current.shift(); // Get the oldest chunk
-
-        // Process the audio chunk
+        const chunkToProcess = audioChunkBuffer.current.shift();
         const response = await process_audio_chunk(chunkToProcess);
         if (response?.transcription) {
-          setTranscriptionList((prevList) => [...prevList, response.transcription]); // Add transcription to the list
+          const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          setTranscriptionList((prevList) => [...prevList, { text: response.transcription, time: currentTime }]);
         }
       }
-    }, 50); // Process every 5ms
+    }, 50);
 
     return () => {
-      clearInterval(processingInterval); // Clean up the interval on unmount or stop
+      clearInterval(processingInterval);
     };
-  }, [isAudioStarted]); // Run this effect when audio starts or stops
-
-  useEffect(() => {
-    return () => {
-      if (audioCtxRef.current) {
-        audioCtxRef.current.close();
-      }
-    };
-  }, []);
+  }, [isAudioStarted]);
 
   return (
-    <div className="w-full h-screen flex flex-row bg-gray-100">
-      <div className="flex flex-col w-2/3 items-center justify-center">
-        <h1 className="text-4xl font-bold text-gray-700 my-4">Real-time Transcription</h1>
+    <div className="relative w-full h-screen flex flex-col lg:flex-row bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white">
+      <div className="flex flex-col w-full lg:w-2/3 items-center justify-center py-8 pt-24"> {/* Added padding-top (pt-24) */}
+        <h1 className="text-5xl font-bold mb-8 drop-shadow-lg">Real-time Transcription</h1>
         {!isAudioStarted ? (
           <div className="flex flex-col items-center justify-center h-3/4">
             {loading ? (
-              <div className="spinner-border text-blue-500 animate-spin w-16 h-16"></div>
+              <div className="spinner-border text-white animate-spin w-16 h-16"></div>
             ) : (
               <button
                 onClick={startAudio}
-                className="bg-blue-500 text-white px-6 py-3 rounded-full shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105"
+                className="relative group bg-gradient-to-r from-green-400 via-blue-500 to-purple-600 text-white px-8 py-4 rounded-full shadow-2xl hover:shadow-green-500/50 transition-all duration-300 ease-in-out transform hover:scale-110 hover:rotate-3"
               >
-                Start Audio
+                <svg
+                  className="w-8 h-8 mr-2 inline-block animate-pulse"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M5 3v18M19 3v18M12 5l6 6-6 6"
+                  ></path>
+                </svg>
+                Start Recording
+                <span className="absolute inset-0 rounded-full bg-white opacity-0 transition-opacity duration-300 ease-in-out group-hover:opacity-20"></span>
               </button>
             )}
           </div>
         ) : (
           <div className="w-full flex-1 flex flex-col items-center">
-            {/* Use AudioVisualizer Component */}
             <AudioVisualizer audioInput={audioInput} audioContext={audioCtxRef.current} isAudioStarted={isAudioStarted} />
             <button
               onClick={stopAudio}
-              className="bg-red-500 text-white px-6 py-3 rounded-full shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 mt-4"
+              className="relative group bg-red-600 text-white px-8 py-4 rounded-full shadow-2xl hover:shadow-red-500/50 transition-all duration-300 ease-in-out transform hover:scale-110 hover:rotate-3 mt-8"
             >
-              Stop Audio
+              <svg
+                className="w-8 h-8 mr-2 inline-block"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M18.364 18.364a9 9 0 11-12.728 0 9 9 0 0112.728 0zM15 10l-6 6m0-6l6 6"
+                ></path>
+              </svg>
+              Stop Recording
+              <span className="absolute inset-0 rounded-full bg-white opacity-0 transition-opacity duration-300 ease-in-out group-hover:opacity-20"></span>
             </button>
           </div>
         )}
       </div>
 
       {/* Transcription List */}
-      <div className="w-1/3 h-full bg-white p-4 overflow-y-auto">
-        <h2 className="text-2xl font-bold text-gray-700 mb-4">Transcriptions</h2>
-        <ul>
-          {transcriptionList.map((transcription, index) => (
-            <li key={index} className="mb-2 text-gray-600">
-              {index + 1}. {transcription}
-            </li>
-          ))}
-        </ul>
+      <div className="w-full lg:w-1/3 p-4 mt-6 lg:mt-0">
+        <TranscriptionList transcriptionList={transcriptionList} />
       </div>
     </div>
   );
