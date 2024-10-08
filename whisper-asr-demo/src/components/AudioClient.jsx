@@ -2,13 +2,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { start_asr, stop_asr, process_audio_chunk } from '@/app/actions/ASRactions';
 import { downsampleBuffer } from '@/lib/utils';
+import AudioVisualizer from '@/components/AudioVisualizer'; // Import the new component
 
 export default function AudioClient() {
-  const [transcription, setTranscription] = useState("");
+  const [transcriptionList, setTranscriptionList] = useState([]); // Store transcription as a list
   const [isAudioStarted, setIsAudioStarted] = useState(false);
   const [loading, setLoading] = useState(false);
   const audioCtxRef = useRef(null);
   const audioChunkBuffer = useRef([]); // Buffer for storing audio chunks
+  const [audioInput, setAudioInput] = useState(null); // Track the audioInput node
 
   const startOrStop = async (start, stop) => {
     if (start) {
@@ -27,7 +29,9 @@ export default function AudioClient() {
       const audioContext = new (window.AudioContext || window.webkitAudioContext)();
       audioCtxRef.current = audioContext;
 
-      const audioInput = audioContext.createMediaStreamSource(stream);
+      const audioInputNode = audioContext.createMediaStreamSource(stream);
+      setAudioInput(audioInputNode); // Store audio input for visualizer
+
       await audioContext.audioWorklet.addModule("/worklet/script-processor.js");
 
       const recorder = new AudioWorkletNode(audioContext, "script-processor");
@@ -37,7 +41,7 @@ export default function AudioClient() {
         audioChunkBuffer.current.push(Array.from(downsampledData)); // Store the audio chunk in the buffer
       };
 
-      audioInput.connect(recorder);
+      audioInputNode.connect(recorder);
       recorder.connect(audioContext.destination);
 
       setLoading(false);
@@ -65,10 +69,10 @@ export default function AudioClient() {
         // Process the audio chunk
         const response = await process_audio_chunk(chunkToProcess);
         if (response?.transcription) {
-          setTranscription(response.transcription);
+          setTranscriptionList((prevList) => [...prevList, response.transcription]); // Add transcription to the list
         }
       }
-    }, 100); // Process every 100ms
+    }, 50); // Process every 5ms
 
     return () => {
       clearInterval(processingInterval); // Clean up the interval on unmount or stop
@@ -84,36 +88,47 @@ export default function AudioClient() {
   }, []);
 
   return (
-    <div className="w-full h-screen flex flex-col items-center bg-gray-100">
-      <h1 className="text-4xl font-bold text-gray-700 my-4">Real-time Transcription</h1>
-      {!isAudioStarted ? (
-        <div className="flex flex-col items-center justify-center h-3/4">
-          {loading ? (
-            <div className="spinner-border text-blue-500 animate-spin w-16 h-16"></div>
-          ) : (
+    <div className="w-full h-screen flex flex-row bg-gray-100">
+      <div className="flex flex-col w-2/3 items-center justify-center">
+        <h1 className="text-4xl font-bold text-gray-700 my-4">Real-time Transcription</h1>
+        {!isAudioStarted ? (
+          <div className="flex flex-col items-center justify-center h-3/4">
+            {loading ? (
+              <div className="spinner-border text-blue-500 animate-spin w-16 h-16"></div>
+            ) : (
+              <button
+                onClick={startAudio}
+                className="bg-blue-500 text-white px-6 py-3 rounded-full shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105"
+              >
+                Start Audio
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="w-full flex-1 flex flex-col items-center">
+            {/* Use AudioVisualizer Component */}
+            <AudioVisualizer audioInput={audioInput} audioContext={audioCtxRef.current} isAudioStarted={isAudioStarted} />
             <button
-              onClick={startAudio}
-              className="bg-blue-500 text-white px-6 py-3 rounded-full shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105"
+              onClick={stopAudio}
+              className="bg-red-500 text-white px-6 py-3 rounded-full shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 mt-4"
             >
-              Start Audio
+              Stop Audio
             </button>
-          )}
-        </div>
-      ) : (
-        <div className="w-full flex-1 flex flex-col items-center">
-          {transcription && (
-            <div className="flex flex-col items-center justify-center h-3/4">
-              <p className="text-lg font-bold text-gray-700">{transcription}</p>
-            </div>
-          )}
-          <button
-            onClick={stopAudio}
-            className="bg-red-500 text-white px-6 py-3 rounded-full shadow-lg transition-all duration-300 ease-in-out transform hover:scale-105 mt-4"
-          >
-            Stop Audio
-          </button>
-        </div>
-      )}
+          </div>
+        )}
+      </div>
+
+      {/* Transcription List */}
+      <div className="w-1/3 h-full bg-white p-4 overflow-y-auto">
+        <h2 className="text-2xl font-bold text-gray-700 mb-4">Transcriptions</h2>
+        <ul>
+          {transcriptionList.map((transcription, index) => (
+            <li key={index} className="mb-2 text-gray-600">
+              {index + 1}. {transcription}
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }
