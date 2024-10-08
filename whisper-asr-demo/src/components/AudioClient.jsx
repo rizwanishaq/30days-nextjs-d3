@@ -2,15 +2,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { start_asr, stop_asr, process_audio_chunk } from '@/app/actions/ASRactions';
 import { downsampleBuffer } from '@/lib/utils';
-import AudioVisualizer from '@/components/AudioVisualizer';
-import TranscriptionList from '@/components/TranscriptionList'; // Import the new component
-import { MdMic, MdStop } from 'react-icons/md'; // Importing microphone and stop icons
+import TranscriptionList from '@/components/TranscriptionList';
+import { MdMic, MdStop } from 'react-icons/md';
 
 export default function AudioClient() {
   const [transcriptionList, setTranscriptionList] = useState([]);
   const [isAudioStarted, setIsAudioStarted] = useState(false);
   const audioCtxRef = useRef(null);
   const audioChunkBuffer = useRef([]);
+  const transcriptionListRef = useRef(null); // Reference for scrolling
   const [audioInput, setAudioInput] = useState(null);
 
   const startOrStop = async (start, stop) => {
@@ -24,14 +24,12 @@ export default function AudioClient() {
   const startAudio = async () => {
     if (typeof window !== 'undefined') {
       await startOrStop(true, false);
-
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const audioContext = new (window.AudioContext || window.webkitAudioContext)();
       audioCtxRef.current = audioContext;
 
       const audioInputNode = audioContext.createMediaStreamSource(stream);
       setAudioInput(audioInputNode);
-
       await audioContext.audioWorklet.addModule("/worklet/script-processor.js");
 
       const recorder = new AudioWorkletNode(audioContext, "script-processor");
@@ -63,7 +61,8 @@ export default function AudioClient() {
         const response = await process_audio_chunk(chunkToProcess);
         if (response?.transcription) {
           const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-          setTranscriptionList((prevList) => [...prevList, { text: response.transcription, time: currentTime }]);
+          // Prepend new transcriptions to the list to reverse order
+          setTranscriptionList((prevList) => [{ text: response.transcription, time: currentTime }, ...prevList]);
         }
       }
     }, 50);
@@ -73,32 +72,38 @@ export default function AudioClient() {
     };
   }, [isAudioStarted]);
 
+  // Scroll to the last message when the transcription list updates
+  useEffect(() => {
+    if (transcriptionListRef.current) {
+      transcriptionListRef.current.scrollTop = transcriptionListRef.current.scrollHeight;
+    }
+  }, [transcriptionList]);
+
   return (
-    <div className="flex flex-col h-screen bg-gray-900 text-white">
-      <div className="flex-1 p-6 overflow-hidden flex flex-col">
-        <h1 className="text-5xl font-bold mb-4 drop-shadow-lg">Real-time Transcription</h1>
-        
-        {/* Scrollable Transcription List */}
-        <div className="flex-1 overflow-y-auto">
+    <div className="flex flex-col h-full">
+      <div className="flex-1 p-4 overflow-hidden flex flex-col">
+        <h1 className="text-4xl font-bold mb-2 drop-shadow-lg">Real-time Transcription</h1>
+
+        {/* Scrollable Transcription List with fixed height */}
+        <div ref={transcriptionListRef} className="flex-1 overflow-y-auto max-h-[60vh] bg-white rounded-lg shadow-md border border-gray-300 p-4">
           <TranscriptionList transcriptionList={transcriptionList} />
         </div>
       </div>
 
-      {/* Fixed Bottom Bar for Visualizer and Control Buttons */}
+      {/* Control Button at the Bottom */}
       <div className="flex justify-center items-center p-4 bg-gray-800 border-t border-gray-700">
-        <AudioVisualizer audioInput={audioInput} audioContext={audioCtxRef.current} isAudioStarted={isAudioStarted} />
-        <div className="flex justify-center items-center space-x-4 ml-4">
+        <div className="flex justify-center items-center space-x-4">
           {!isAudioStarted ? (
             <button
               onClick={startAudio}
-              className="p-4 bg-green-500 rounded-full shadow-md hover:bg-green-400 transition duration-300"
+              className="p-2 bg-green-500 rounded-full shadow-md hover:bg-green-400 transition duration-300"
             >
               <MdMic className="h-6 w-6 text-white" />
             </button>
           ) : (
             <button
               onClick={stopAudio}
-              className="p-4 bg-red-500 rounded-full shadow-md hover:bg-red-400 transition duration-300"
+              className="p-2 bg-red-500 rounded-full shadow-md hover:bg-red-400 transition duration-300"
             >
               <MdStop className="h-6 w-6 text-white" />
             </button>

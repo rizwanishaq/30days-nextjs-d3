@@ -26,10 +26,10 @@ export default function RootLayout({ children }) {
         className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen bg-gray-100`}
       >
         <Header />
-        <main className="flex-grow p-4"> {/* Added padding to main for breathing room */}
+        <main className="flex-grow flex flex-col justify-center overflow-hidden p-4">
           {children}
         </main>
-        <Footer className="mt-10" /> {/* Added margin-top for separation from content */}
+        <Footer className="mt-10" />
       </body>
     </html>
   );
