@@ -60,10 +60,11 @@ export default function AudioClient() {
         const chunkToProcess = audioChunkBuffer.current.shift();
         const response = await process_audio_chunk(chunkToProcess);
         if (response?.transcription) {
-          // const AIresponse = await get_completion(response.transcription);
+          const AIresponse = await get_completion(response.transcription);
           const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
           // Prepend new transcriptions to the list to reverse order
-          setTranscriptionList((prevList) => [{ text: response.transcription, time: currentTime }, ...prevList]);
+          setTranscriptionList((prevList) => [{ text: AIresponse.text, time: currentTime }, ...prevList]);
+          // setTranscriptionList((prevList) => [{ text: response.transcription, time: currentTime }, ...prevList]);
         }
       }
     }, 50);
