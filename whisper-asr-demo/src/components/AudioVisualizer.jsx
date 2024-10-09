@@ -1,101 +1,79 @@
-import { useRef, useEffect } from 'react';
+// components/AudioVisualizer.jsx
+import { useEffect, useRef } from 'react';
 
-export default function AudioVisualizer({ audioInput, audioContext, isAudioStarted }) {
+const AudioVisualizer = ({ audioContext, audioInput }) => {
   const canvasRef = useRef(null);
+  const animationRef = useRef(null);
+  const audioLevelRef = useRef(0);
 
   useEffect(() => {
-    if (!isAudioStarted || !audioInput || !audioContext) return;
-
-    const analyser = audioContext.createAnalyser();
-    analyser.fftSize = 2048;
-    const bufferLength = analyser.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
-
-    audioInput.connect(analyser);
-
     const canvas = canvasRef.current;
-    const canvasCtx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d');
+    canvas.width = canvas.offsetWidth;
+    canvas.height = canvas.offsetHeight;
 
-    const draw = () => {
-      if (!canvas || !canvasCtx) return;
+    let analyzerNode;
+    let dataArray;
+    let bufferLength;
 
-      requestAnimationFrame(draw);
+    if (audioContext && audioInput) {
+      const analyzer = audioContext.createAnalyser();
+      analyzer.fftSize = 256;
+      bufferLength = analyzer.frequencyBinCount;
+      dataArray = new Uint8Array(bufferLength);
 
-      analyser.getByteTimeDomainData(dataArray);
-      canvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+      // Connect the audio input to the analyser
+      audioInput.connect(analyzer);
+      analyzerNode = analyzer;
 
-      // Create a gradient for the waveform
-      const gradient = canvasCtx.createLinearGradient(0, 0, 0, canvas.height);
-      gradient.addColorStop(0, '#ff0080');
-      gradient.addColorStop(0.5, '#ff8c00');
-      gradient.addColorStop(1, '#00bfff');
+      // Function to draw the visualizer bar
+      const drawVisualizer = () => {
+        if (!analyzerNode) return;
 
-      // Set styles for the waveform
-      canvasCtx.lineWidth = 3;
-      canvasCtx.strokeStyle = gradient;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      canvasCtx.beginPath();
-      const sliceWidth = canvas.width / bufferLength;
-      let x = 0;
+        // Get frequency data
+        analyzerNode.getByteFrequencyData(dataArray);
 
-      for (let i = 0; i < bufferLength; i++) {
-        const v = dataArray[i] / 128.0; // Normalize the value
-        const y = (v * canvas.height) / 2; // Scale to canvas height
+        // Calculate the audio level (amplitude)
+        const amplitude = dataArray.reduce((sum, value) => sum + value, 0) / bufferLength;
+        audioLevelRef.current = amplitude;
 
-        if (i === 0) {
-          canvasCtx.moveTo(x, y);
-        } else {
-          canvasCtx.lineTo(x, y);
-        }
+        // Draw the background bar
+        ctx.fillStyle = '#222'; // Dark grey background
+        const barHeight = 20;
+        ctx.fillRect(50, canvas.height / 2 - barHeight / 2, canvas.width - 100, barHeight);
 
-        x += sliceWidth;
-      }
+        // Draw the active level on the bar
+        ctx.fillStyle = '#00ffff'; // Cyan active level color
+        const barWidth = ((canvas.width - 100) * amplitude) / 255; // Normalize amplitude to canvas width
+        ctx.fillRect(50, canvas.height / 2 - barHeight / 2, barWidth, barHeight);
 
-      canvasCtx.lineTo(canvas.width, canvas.height / 2);
-      canvasCtx.stroke();
+        animationRef.current = requestAnimationFrame(drawVisualizer);
+      };
 
-      // Draw a glowing effect around the waveform
-      canvasCtx.shadowColor = 'rgba(255, 255, 255, 0.5)';
-      canvasCtx.shadowBlur = 10;
-      canvasCtx.stroke();
-
-      // Draw a grid for better visibility
-      drawGrid(canvasCtx, canvas.width, canvas.height);
-    };
-
-    const drawGrid = (ctx, width, height) => {
-      ctx.save();
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-      ctx.lineWidth = 0.5;
-
-      for (let i = 0; i < width; i += 20) {
-        ctx.beginPath();
-        ctx.moveTo(i, 0);
-        ctx.lineTo(i, height);
-        ctx.stroke();
-      }
-
-      for (let i = 0; i < height; i += 20) {
-        ctx.beginPath();
-        ctx.moveTo(0, i);
-        ctx.lineTo(width, i);
-        ctx.stroke();
-      }
-
-      ctx.restore();
-    };
-
-    draw();
+      drawVisualizer();
+    }
 
     return () => {
-      audioInput.disconnect(analyser);
+      if (analyzerNode) {
+        analyzerNode.disconnect();
+      }
+      cancelAnimationFrame(animationRef.current);
     };
-  }, [audioInput, audioContext, isAudioStarted]);
+  }, [audioContext, audioInput]);
 
   return (
-    <div className="relative w-full h-40 my-4"> {/* Updated margins */}
-      <canvas ref={canvasRef} className="w-full h-full bg-gray-900 rounded-lg shadow-lg" />
-      <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-blue-500 opacity-30 rounded-lg blur-lg"></div>
+    <div className="flex flex-col items-center">
+      {/* Canvas Bar Visualizer */}
+      <canvas
+        ref={canvasRef}
+        className="w-full h-6 bg-black rounded-full shadow-lg"
+      ></canvas>
+
+    
     </div>
   );
-}
+};
+
+export default AudioVisualizer;

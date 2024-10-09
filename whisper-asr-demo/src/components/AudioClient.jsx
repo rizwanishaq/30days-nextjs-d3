@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { start_asr, stop_asr, process_audio_chunk } from '@/app/actions/ASRactions';
 import TranscriptionList from '@/components/TranscriptionList';
 import { MdMic, MdStop } from 'react-icons/md';
+import AudioVisualizer from '@/components/AudioVisualizer'; // Import the visualizer component
 
 export default function AudioClient() {
   const [transcriptionList, setTranscriptionList] = useState([]);
@@ -85,6 +86,11 @@ export default function AudioClient() {
         {/* Scrollable Transcription List with fixed height */}
         <div ref={transcriptionListRef} className="flex-1 overflow-y-auto max-h-[60vh] bg-white rounded-lg shadow-md border border-gray-300 p-4">
           <TranscriptionList transcriptionList={transcriptionList} />
+        </div>
+
+        {/* Audio Visualizer Section */}
+        <div className="mt-6">
+          <AudioVisualizer audioContext={audioCtxRef.current} audioInput={audioInput} />
         </div>
       </div>
 
