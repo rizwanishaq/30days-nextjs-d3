@@ -1,7 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { start_asr, stop_asr, process_audio_chunk } from '@/app/actions/ASRactions';
-import { downsampleBuffer } from '@/lib/utils';
 import TranscriptionList from '@/components/TranscriptionList';
 import { MdMic, MdStop } from 'react-icons/md';
 
@@ -34,8 +33,7 @@ export default function AudioClient() {
 
       const recorder = new AudioWorkletNode(audioContext, "script-processor");
       recorder.port.onmessage = (e) => {
-        const inputAudioChunk = e.data;
-        const downsampledData = downsampleBuffer(inputAudioChunk, audioContext.sampleRate, 16000);
+        const downsampledData = e.data;
         audioChunkBuffer.current.push(Array.from(downsampledData));
       };
 
