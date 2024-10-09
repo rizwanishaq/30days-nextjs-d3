@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { start_asr, stop_asr, process_audio_chunk } from '@/app/actions/ASRactions';
+import { get_completion } from '@/app/actions/AIActions';
 import TranscriptionList from '@/components/TranscriptionList';
 import { MdMic, MdStop } from 'react-icons/md';
 import AudioVisualizer from '@/components/AudioVisualizer'; // Import the visualizer component
@@ -59,6 +60,7 @@ export default function AudioClient() {
         const chunkToProcess = audioChunkBuffer.current.shift();
         const response = await process_audio_chunk(chunkToProcess);
         if (response?.transcription) {
+          // const AIresponse = await get_completion(response.transcription);
           const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
           // Prepend new transcriptions to the list to reverse order
           setTranscriptionList((prevList) => [{ text: response.transcription, time: currentTime }, ...prevList]);
